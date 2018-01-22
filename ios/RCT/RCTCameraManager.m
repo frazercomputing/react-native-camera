@@ -1066,8 +1066,9 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
     AVCaptureDevice *device = [[self videoCaptureDeviceInput] device];
     if ([device lockForConfiguration:&error]) {
         CGFloat zoomFactor = device.videoZoomFactor + atan(velocity / pinchVelocityDividerFactor);
-        if (zoomFactor > device.activeFormat.videoMaxZoomFactor) {
-            zoomFactor = device.activeFormat.videoMaxZoomFactor;
+        CGFloat maxZoom = MIN(device.activeFormat.videoMaxZoomFactor, 4);
+        if (zoomFactor > maxZoom) {
+            zoomFactor = maxZoom;
         } else if (zoomFactor < 1) {
             zoomFactor = 1.0f;
         }
