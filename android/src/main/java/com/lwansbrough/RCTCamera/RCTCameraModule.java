@@ -394,17 +394,15 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
 
             // Release the MediaRecorder.
             mMediaRecorder.release();
-
-            // Reset variable.
-            mMediaRecorder = null;
         }
 
         // Lock the camera so that future MediaRecorder sessions can use it by calling
-        // Camera.lock(). Note this is not required on Android 4.0+ unless the
-        // MediaRecorder.prepare() call fails.
-        if (mCamera != null) {
+        // Camera.lock(). On Android 4.0+ this is only required if the MediaRecorder.prepare() call fails.
+        if (mMediaRecorder == null && mCamera != null) {
             mCamera.lock();
         }
+
+        mMediaRecorder = null;
 
         if (mRecordingPromise == null) {
             return;
