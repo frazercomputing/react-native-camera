@@ -11,17 +11,17 @@ const float squareLength = 80.0f;
         // Initialization code
 
         [self setBackgroundColor:[UIColor clearColor]];
-        [self.layer setBorderWidth:1.0];
-        [self.layer setCornerRadius:4.0];
-        [self.layer setBorderColor:[UIColor colorWithRed:1 green:1 blue:1 alpha:0.5].CGColor];
+        [self.layer setBorderWidth:1];
+        [self.layer setCornerRadius:1.0];
+        [self.layer setBorderColor:[UIColor colorWithRed:1 green:0.8 blue:0 alpha:1].CGColor];
 
         CABasicAnimation* selectionAnimation = [CABasicAnimation
                                                 animationWithKeyPath:@"borderColor"];
-        selectionAnimation.toValue = (id)[UIColor colorWithRed:1 green:1 blue:0 alpha:0.5].CGColor;
+        selectionAnimation.toValue = (id)[UIColor colorWithRed:1 green:0.8 blue:0 alpha:0.66].CGColor;
         selectionAnimation.repeatCount = 4;
+        selectionAnimation.duration = 0.5;
         [self.layer addAnimation:selectionAnimation
                           forKey:@"selectionAnimation"];
-
     }
     return self;
 }

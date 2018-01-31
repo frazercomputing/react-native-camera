@@ -152,16 +152,20 @@
 
         // Show animated rectangle on the touched area
         if (_defaultOnFocusComponent) {
-            self.camFocus = [[RCTCameraFocusSquare alloc]initWithFrame:CGRectMake(touchPoint.x-40, touchPoint.y-40, 80, 80)];
+            int startSize = 120, endSize = 70;
+            self.camFocus = [[RCTCameraFocusSquare alloc]initWithFrame:
+                             CGRectMake(touchPoint.x - startSize / 2, touchPoint.y - startSize / 2, startSize, startSize)];
             [self.camFocus setBackgroundColor:[UIColor clearColor]];
             [self addSubview:self.camFocus];
             [self.camFocus setNeedsDisplay];
 
-            [UIView beginAnimations:nil context:NULL];
-            [UIView setAnimationDuration:1.0];
-            [self.camFocus setAlpha:0.0];
-            [UIView commitAnimations];
-        }
+            [UIView animateWithDuration:0.15 animations:^{
+                self.camFocus.frame = CGRectMake(touchPoint.x - endSize / 2, touchPoint.y - endSize / 2, endSize, endSize);
+            }];
+            [UIView animateWithDuration:0.5 delay:0.5 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+                self.camFocus.alpha = 0.0;
+            } completion:nil];
+          }
     }
 
     if (allTouchesEnded) {
