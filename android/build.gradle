@@ -46,3 +46,9 @@ dependencies {
 
   compile 'com.github.react-native-community:cameraview:df60b07573'
 }
+
+configurations.all {
+  resolutionStrategy {
+    force 'com.android.support:support-v4:26.0.2'
+  }
+}
