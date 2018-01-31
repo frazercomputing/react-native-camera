@@ -25,6 +25,7 @@
   BOOL _defaultOnFocusComponent;
   BOOL _onZoomChanged;
   BOOL _previousIdleTimerDisabled;
+  CGFloat _zoomFactor;
 }
 
 - (void)setOrientation:(NSInteger)orientation
@@ -77,6 +78,7 @@
     _defaultOnFocusComponent = YES;
     _onZoomChanged = NO;
     _previousIdleTimerDisabled = [UIApplication sharedApplication].idleTimerDisabled;
+    _zoomFactor = 1.0;
   }
   return self;
 }
@@ -178,8 +180,12 @@
 -(void) handlePinchToZoomRecognizer:(UIPinchGestureRecognizer*)pinchRecognizer {
     if (!_onZoomChanged) return;
 
+    CGFloat newZoomFactor = MAX(1.0, MIN(4.0, _zoomFactor * pinchRecognizer.scale));
     if (pinchRecognizer.state == UIGestureRecognizerStateChanged) {
-        [self.manager zoom:pinchRecognizer.velocity reactTag:self.reactTag];
+        [self.manager zoom:newZoomFactor reactTag:self.reactTag];
+    }
+    else if (pinchRecognizer.state == UIGestureRecognizerStateEnded) {
+        _zoomFactor = newZoomFactor;
     }
 }
 

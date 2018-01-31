@@ -1052,18 +1052,13 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
     }
 }
 
-- (void)zoom:(CGFloat)velocity reactTag:(NSNumber *)reactTag{
-    if (isnan(velocity)) {
-        return;
-    }
-    const CGFloat pinchVelocityDividerFactor = 20.0f; // TODO: calibrate or make this component's property
+- (void)zoom:(CGFloat)zoomFactor reactTag:(NSNumber *)reactTag
+{
     NSError *error = nil;
     AVCaptureDevice *device = [[self videoCaptureDeviceInput] device];
     if ([device lockForConfiguration:&error]) {
-        CGFloat zoomFactor = device.videoZoomFactor + atan(velocity / pinchVelocityDividerFactor);
-        CGFloat maxZoom = MIN(device.activeFormat.videoMaxZoomFactor, 4);
-        if (zoomFactor > maxZoom) {
-            zoomFactor = maxZoom;
+        if (zoomFactor > device.activeFormat.videoMaxZoomFactor) {
+            zoomFactor = device.activeFormat.videoMaxZoomFactor;
         } else if (zoomFactor < 1) {
             zoomFactor = 1.0f;
         }
@@ -1071,7 +1066,6 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
         NSDictionary *event = @{
           @"target": reactTag,
           @"zoomFactor": [NSNumber numberWithDouble:zoomFactor],
-          @"velocity": [NSNumber numberWithDouble:velocity]
         };
 
         [self.bridge.eventDispatcher sendInputEventWithName:@"zoomChanged" body:event];
