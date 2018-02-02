@@ -14,7 +14,7 @@
 @interface RCTCameraManager ()
 
 @property (strong, nonatomic) RCTSensorOrientationChecker * sensorOrientationChecker;
-@property (assign, nonatomic) NSInteger* flashMode;
+@property (assign, nonatomic) AVCaptureFlashMode flashMode;
 
 @end
 
@@ -276,7 +276,7 @@ RCT_CUSTOM_VIEW_PROPERTY(flashMode, NSInteger, RCTCamera) {
 
 RCT_CUSTOM_VIEW_PROPERTY(torchMode, NSInteger, RCTCamera) {
   dispatch_async(self.sessionQueue, ^{
-    NSInteger *torchMode = [RCTConvert NSInteger:json];
+    NSInteger torchMode = [RCTConvert NSInteger:json];
     AVCaptureDevice *device = [self.videoCaptureDeviceInput device];
     NSError *error = nil;
 
@@ -285,7 +285,7 @@ RCT_CUSTOM_VIEW_PROPERTY(torchMode, NSInteger, RCTCamera) {
       NSLog(@"%@", error);
       return;
     }
-    [device setTorchMode: torchMode];
+    [device setTorchMode:torchMode];
     [device unlockForConfiguration];
   });
 }
