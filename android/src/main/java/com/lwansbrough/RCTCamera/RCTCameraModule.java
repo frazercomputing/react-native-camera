@@ -575,8 +575,6 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
      * concurrently which would blow the memory (esp on smaller devices), and slow things down.
      */
     private synchronized void processImage(MutableImage mutableImage, ReadableMap options, Promise promise) {
-        int orientation = _reactContext.getResources().getConfiguration().orientation;
-
         boolean shouldFixOrientation = options.hasKey("fixOrientation") && options.getBoolean("fixOrientation");
         if(shouldFixOrientation) {
             try {
@@ -586,14 +584,20 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
             }
         }
 
+        boolean needsReorient = false;
+        double previewRatio, pictureRatio = (double) mutableImage.getWidth() / (double) mutableImage.getHeight();
+        try {
+            int type = options.getInt("type");
+            previewRatio = (double) RCTCamera.getInstance().getPreviewVisibleWidth(type) / (double) RCTCamera.getInstance().getPreviewVisibleHeight(type);
+            needsReorient = (previewRatio > 1) != (pictureRatio > 1);
+        } catch (IllegalArgumentException e) {
+            previewRatio = pictureRatio;
+        }
+
         boolean shouldCropToPreview = options.hasKey("cropToPreview") && options.getBoolean("cropToPreview");
         if (shouldCropToPreview) {
             try {
-                int type = options.getInt("type");
-                float paddingWidth = RCTCamera.getInstance().getPreviewPaddingWidth(type);
-                float paddingHeight = RCTCamera.getInstance().getPreviewPaddingHeight(type);
-
-                mutableImage.cropToPreview(orientation, paddingWidth, paddingHeight);
+                mutableImage.cropToPreview(needsReorient ? 1.0 / previewRatio : previewRatio);
             } catch (IllegalArgumentException e) {
                 promise.reject("Error cropping image to preview", e);
             }
@@ -613,8 +617,8 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
             jpegQualityPercent = options.getInt("jpegQuality");
         }
 
-        int imgWidth = (orientation == Configuration.ORIENTATION_PORTRAIT) ? mutableImage.getHeight() : mutableImage.getWidth();
-        int imgHeight = (orientation == Configuration.ORIENTATION_PORTRAIT) ? mutableImage.getWidth() : mutableImage.getHeight();
+        int imgWidth = (needsReorient) ? mutableImage.getHeight() : mutableImage.getWidth();
+        int imgHeight = (needsReorient) ? mutableImage.getWidth() : mutableImage.getHeight();
 
         switch (options.getInt("target")) {
             case RCT_CAMERA_CAPTURE_TARGET_MEMORY:
@@ -695,28 +699,6 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
     }
 
     @ReactMethod
-    public void stopPreview(ReadableMap options) {
-        RCTCamera instance = RCTCamera.getInstance();
-        if (instance == null) return;
-
-        Camera camera = instance.acquireCameraInstance(options.getInt("type"));
-        if (camera == null) return;
-
-        camera.stopPreview();
-    }
-
-    @ReactMethod
-    public void startPreview(ReadableMap options) {
-        RCTCamera instance = RCTCamera.getInstance();
-        if (instance == null) return;
-
-        Camera camera = instance.acquireCameraInstance(options.getInt("type"));
-        if (camera == null) return;
-
-        camera.startPreview();
-    }
-
-    @ReactMethod
     public void hasFlash(ReadableMap options, final Promise promise) {
         Camera camera = RCTCamera.getInstance().acquireCameraInstance(options.getInt("type"));
         if (null == camera) {
@@ -725,6 +707,24 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
         }
         List<String> flashModes = camera.getParameters().getSupportedFlashModes();
         promise.resolve(null != flashModes && !flashModes.isEmpty());
+    }
+
+    @ReactMethod
+    public void setZoom(ReadableMap options, int zoom) {
+        RCTCamera instance = RCTCamera.getInstance();
+        if (instance == null) return;
+
+        Camera camera = instance.acquireCameraInstance(options.getInt("type"));
+        if (camera == null) return;
+
+        Camera.Parameters parameters = camera.getParameters();
+        int maxZoom = parameters.getMaxZoom();
+        if (parameters.isZoomSupported()) {
+            if (zoom >=0 && zoom < maxZoom) {
+                parameters.setZoom(zoom);
+                camera.setParameters(parameters);
+            }
+        }
     }
 
     private File getOutputMediaFile(int type) {

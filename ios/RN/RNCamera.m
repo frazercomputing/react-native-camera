@@ -1,13 +1,11 @@
 #import "RNCamera.h"
 #import "RNCameraUtils.h"
 #import "RNImageUtils.h"
-#import "RNCameraManager.h"
 #import "RNFileSystem.h"
 #import <React/RCTEventDispatcher.h>
 #import <React/RCTLog.h>
 #import <React/RCTUtils.h>
 #import <React/UIView+React.h>
-#import <AVFoundation/AVFoundation.h>
 
 @interface RNCamera ()
 
@@ -51,6 +49,7 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
                                                  selector:@selector(orientationChanged:)
                                                      name:UIDeviceOrientationDidChangeNotification
                                                    object:nil];
+        self.autoFocus = -1;
         //        [[NSNotificationCenter defaultCenter] addObserver:self
         //                                                 selector:@selector(bridgeDidForeground:)
         //                                                     name:EX_UNVERSIONED(@"EXKernelBridgeDidForegroundNotification")
@@ -211,7 +210,7 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
     AVCaptureDevice *device = [self.videoCaptureDeviceInput device];
     NSError *error = nil;
     
-    if (device.focusMode != RNCameraAutoFocusOff) {
+    if (self.autoFocus < 0 || device.focusMode != RNCameraAutoFocusOff) {
         return;
     }
     
@@ -287,22 +286,22 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
 
 - (void)updateFaceDetecting:(id)faceDetecting
 {
-    //    [_faceDetectorManager setIsEnabled:faceDetecting];
+    [_faceDetectorManager setIsEnabled:faceDetecting];
 }
 
 - (void)updateFaceDetectionMode:(id)requestedMode
 {
-    //    [_faceDetectorManager setMode:requestedMode];
+    [_faceDetectorManager setMode:requestedMode];
 }
 
 - (void)updateFaceDetectionLandmarks:(id)requestedLandmarks
 {
-    //    [_faceDetectorManager setLandmarksDetected:requestedLandmarks];
+    [_faceDetectorManager setLandmarksDetected:requestedLandmarks];
 }
 
 - (void)updateFaceDetectionClassifications:(id)requestedClassifications
 {
-    //    [_faceDetectorManager setClassificationsDetected:requestedClassifications];
+    [_faceDetectorManager setClassificationsDetected:requestedClassifications];
 }
 
 - (void)takePicture:(NSDictionary *)options resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
@@ -322,11 +321,15 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
             CGRect cropRect = CGRectMake(frame.origin.x * width, frame.origin.y * height, frame.size.width * width, frame.size.height * height);
             takenImage = [RNImageUtils cropImage:takenImage toRect:cropRect];
             
+            if ([options[@"mirrorImage"] boolValue]) {
+                takenImage = [RNImageUtils mirrorImage:takenImage];
+            }
+            
             NSMutableDictionary *response = [[NSMutableDictionary alloc] init];
             float quality = [options[@"quality"] floatValue];
             NSData *takenImageData = UIImageJPEGRepresentation(takenImage, quality);
-            //            NSString *path = [RCTFileSystem generatePathInDirectory:[self.bridge.scopedModules.fileSystem.cachesDirectory stringByAppendingPathComponent:@"Camera"] withExtension:@".jpg"];
-            //            response[@"uri"] = [RCTImageUtils writeImage:takenImageData toPath:path];
+            NSString *path = [RNFileSystem generatePathInDirectory:[[RNFileSystem cacheDirectoryPath] stringByAppendingPathComponent:@"Camera"] withExtension:@".jpg"];
+            response[@"uri"] = [RNImageUtils writeImage:takenImageData toPath:path];
             response[@"width"] = @(takenImage.size.width);
             response[@"height"] = @(takenImage.size.height);
             
@@ -338,16 +341,21 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
                 int imageRotation;
                 switch (takenImage.imageOrientation) {
                     case UIImageOrientationLeft:
+                    case UIImageOrientationRightMirrored:
                         imageRotation = 90;
                         break;
                     case UIImageOrientationRight:
+                    case UIImageOrientationLeftMirrored:
                         imageRotation = -90;
                         break;
                     case UIImageOrientationDown:
+                    case UIImageOrientationDownMirrored:
                         imageRotation = 180;
                         break;
+                    case UIImageOrientationUpMirrored:
                     default:
                         imageRotation = 0;
+                        break;
                 }
                 [RNImageUtils updatePhotoMetadata:imageSampleBuffer withAdditionalData:@{ @"Orientation": @(imageRotation) } inResponse:response]; // TODO
             }
@@ -365,7 +373,7 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
         // At the time of writing AVCaptureMovieFileOutput and AVCaptureVideoDataOutput (> GMVDataOutput)
         // cannot coexist on the same AVSession (see: https://stackoverflow.com/a/4986032/1123156).
         // We stop face detection here and restart it in when AVCaptureMovieFileOutput finishes recording.
-        //        [_faceDetectorManager stopFaceDetection];
+        [_faceDetectorManager stopFaceDetection];
         [self setupMovieFileCapture];
     }
     
@@ -389,9 +397,9 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
         [connection setVideoOrientation:[RNCameraUtils videoOrientationForInterfaceOrientation:[[UIApplication sharedApplication] statusBarOrientation]]];
         
         dispatch_async(self.sessionQueue, ^{
-            //            NSString *path = [RCTFileSystem generatePathInDirectory:[self.bridge.scopedModules.fileSystem.cachesDirectory stringByAppendingPathComponent:@"Camera"] withExtension:@".mov"];
-            //            NSURL *outputURL = [[NSURL alloc] initFileURLWithPath:path];
-            //            [self.movieFileOutput startRecordingToOutputFileURL:outputURL recordingDelegate:self];
+            NSString *path = [RNFileSystem generatePathInDirectory:[[RNFileSystem cacheDirectoryPath] stringByAppendingString:@"Camera"] withExtension:@".mov"];
+            NSURL *outputURL = [[NSURL alloc] initFileURLWithPath:path];
+            [self.movieFileOutput startRecordingToOutputFileURL:outputURL recordingDelegate:self];
             self.videoRecordedResolve = resolve;
             self.videoRecordedReject = reject;
         });
@@ -426,7 +434,7 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
             self.stillImageOutput = stillImageOutput;
         }
         
-        //        [_faceDetectorManager maybeStartFaceDetectionOnSession:_session withPreviewLayer:_previewLayer];
+        [_faceDetectorManager maybeStartFaceDetectionOnSession:_session withPreviewLayer:_previewLayer];
         [self setupOrDisableBarcodeScanner];
         
         __weak RNCamera *weakSelf = self;
@@ -452,7 +460,7 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
     return;
 #endif
     dispatch_async(self.sessionQueue, ^{
-        //        [_faceDetectorManager stopFaceDetection];
+        [_faceDetectorManager stopFaceDetection];
         [self.previewLayer removeFromSuperlayer];
         [self.session commitConfiguration];
         [self.session stopRunning];
@@ -707,7 +715,7 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
     [self cleanupMovieFileCapture];
     // If face detection has been running prior to recording to file
     // we reenable it here (see comment in -record).
-    //    [_faceDetectorManager maybeStartFaceDetectionOnSession:_session withPreviewLayer:_previewLayer];
+    [_faceDetectorManager maybeStartFaceDetectionOnSession:_session withPreviewLayer:_previewLayer];
     
     if (self.session.sessionPreset != AVCaptureSessionPresetHigh) {
         [self updateSessionPreset:AVCaptureSessionPresetHigh];
@@ -718,14 +726,14 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
 
 - (id)createFaceDetectorManager
 {
-    //    Class faceDetectorManagerClass = NSClassFromString(@"EXFaceDetectorManager"); //ruim
-    //    Class faceDetectorManagerStubClass = NSClassFromString(@"EXFaceDetectorManagerStub"); //ruim
-    //
-    //    if (faceDetectorManagerClass) {
-    //        return [[faceDetectorManagerClass alloc] initWithSessionQueue:_sessionQueue delegate:self];
-    //    } else if (faceDetectorManagerStubClass) {
-    //        return [[faceDetectorManagerStubClass alloc] init];
-    //    }
+    Class faceDetectorManagerClass = NSClassFromString(@"RNFaceDetectorManager");
+    Class faceDetectorManagerStubClass = NSClassFromString(@"RNFaceDetectorManagerStub");
+    
+    if (faceDetectorManagerClass) {
+        return [[faceDetectorManagerClass alloc] initWithSessionQueue:_sessionQueue delegate:self];
+    } else if (faceDetectorManagerStubClass) {
+        return [[faceDetectorManagerStubClass alloc] init];
+    }
     
     return nil;
 }

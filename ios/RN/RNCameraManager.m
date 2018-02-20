@@ -9,15 +9,9 @@
 #import <React/RCTUtils.h>
 #import <React/UIView+React.h>
 
-//#if __has_include("EXFaceDetectorManager.h")
-//#import "EXFaceDetectorManager.h"
-//#else
-//#import "EXFaceDetectorManagerStub.h"
-//#endif
-
 @implementation RNCameraManager
 
-RCT_EXPORT_MODULE(ReactNativeCameraManager);
+RCT_EXPORT_MODULE(RNCameraManager);
 RCT_EXPORT_VIEW_PROPERTY(onCameraReady, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onMountError, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onBarCodeRead, RCTDirectEventBlock);
@@ -61,15 +55,14 @@ RCT_EXPORT_VIEW_PROPERTY(onFacesDetected, RCTDirectEventBlock);
                      @"480p": @(RNCameraVideo4x3),
                      @"4:3": @(RNCameraVideo4x3),
                      },
-             @"BarCodeType" : [[self class] validBarCodeTypes]
-             //             @"FaceDetection" : [[self  class] faceDetectorConstants]
+             @"BarCodeType" : [[self class] validBarCodeTypes],
+             @"FaceDetection" : [[self  class] faceDetectorConstants]
              };
 }
 
 - (NSArray<NSString *> *)supportedEvents
 {
-    //    return @[@"onCameraReady", @"onMountError", @"onBarCodeRead", @"onFacesDetected"];
-    return @[@"onCameraReady", @"onMountError", @"onBarCodeRead"];
+    return @[@"onCameraReady", @"onMountError", @"onBarCodeRead", @"onFacesDetected"];
 }
 
 + (NSDictionary *)validBarCodeTypes
@@ -81,7 +74,7 @@ RCT_EXPORT_VIEW_PROPERTY(onFacesDetected, RCTDirectEventBlock);
              @"ean13" : AVMetadataObjectTypeEAN13Code,
              @"ean8" : AVMetadataObjectTypeEAN8Code,
              @"code93" : AVMetadataObjectTypeCode93Code,
-             @"code138" : AVMetadataObjectTypeCode128Code,
+             @"code128" : AVMetadataObjectTypeCode128Code,
              @"pdf417" : AVMetadataObjectTypePDF417Code,
              @"qr" : AVMetadataObjectTypeQRCode,
              @"aztec" : AVMetadataObjectTypeAztecCode,
@@ -93,13 +86,11 @@ RCT_EXPORT_VIEW_PROPERTY(onFacesDetected, RCTDirectEventBlock);
 
 + (NSDictionary *)faceDetectorConstants
 {
-    //#if __has_include("EXFaceDetectorManager.h")
-    //    return [EXFaceDetectorManager constants];
-    //#elif __has_include("EXFaceDetectorManagerStub.h")
-    //    return [EXFaceDetectorManagerStub constants];
-    //#endif
-    
-    return nil;
+#if __has_include("RNFaceDetectorManager.h")
+    return [RNFaceDetectorManager constants];
+#else
+    return [RNFaceDetectorManagerStub constants];
+#endif
 }
 
 RCT_CUSTOM_VIEW_PROPERTY(type, NSInteger, RNCamera)
@@ -181,10 +172,10 @@ RCT_REMAP_METHOD(takePicture,
 #if TARGET_IPHONE_SIMULATOR
     NSMutableDictionary *response = [[NSMutableDictionary alloc] init];
     float quality = [options[@"quality"] floatValue];
-    //    NSString *path = [RCTFileSystem generatePathInDirectory:[self.bridge.scopedModules.fileSystem.cachesDirectory stringByAppendingPathComponent:@"Camera"] withExtension:@".jpg"];
+    NSString *path = [RNFileSystem generatePathInDirectory:[[RNFileSystem cacheDirectoryPath] stringByAppendingPathComponent:@"Camera"] withExtension:@".jpg"];
     UIImage *generatedPhoto = [RNImageUtils generatePhotoOfSize:CGSizeMake(200, 200)];
     NSData *photoData = UIImageJPEGRepresentation(generatedPhoto, quality);
-    //    response[@"uri"] = [RCTImageUtils writeImage:photoData toPath:path];
+    response[@"uri"] = [RNImageUtils writeImage:photoData toPath:path];
     response[@"width"] = @(generatedPhoto.size.width);
     response[@"height"] = @(generatedPhoto.size.height);
     if ([options[@"base64"] boolValue]) {
@@ -232,6 +223,32 @@ RCT_REMAP_METHOD(stopRecording, reactTag:(nonnull NSNumber *)reactTag)
         } else {
             [view stopRecording];
         }
+    }];
+}
+
+RCT_EXPORT_METHOD(checkDeviceAuthorizationStatus:(RCTPromiseResolveBlock)resolve
+                  reject:(__unused RCTPromiseRejectBlock)reject) {
+    __block NSString *mediaType = AVMediaTypeVideo;
+    
+    [AVCaptureDevice requestAccessForMediaType:mediaType completionHandler:^(BOOL granted) {
+        if (!granted) {
+            resolve(@(granted));
+        }
+        else {
+            mediaType = AVMediaTypeAudio;
+            [AVCaptureDevice requestAccessForMediaType:mediaType completionHandler:^(BOOL granted) {
+                resolve(@(granted));
+            }];
+        }
+    }];
+}
+
+RCT_EXPORT_METHOD(checkVideoAuthorizationStatus:(RCTPromiseResolveBlock)resolve
+                  reject:(__unused RCTPromiseRejectBlock)reject) {
+    __block NSString *mediaType = AVMediaTypeVideo;
+    
+    [AVCaptureDevice requestAccessForMediaType:mediaType completionHandler:^(BOOL granted) {
+        resolve(@(granted));
     }];
 }
 
