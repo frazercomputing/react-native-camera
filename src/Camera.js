@@ -196,8 +196,11 @@ export default class Camera extends Component {
       // On devices before SDK version 23, the permissions are automatically granted if they appear in the manifest,
       // so check and request should always be true.
       // https://github.com/facebook/react-native-website/blob/master/docs/permissionsandroid.md
-      const isAuthorized =
-        Platform.Version >= 23 ? granted === PermissionsAndroid.RESULTS.GRANTED : granted === true;
+
+      const isAuthorized = granted === PermissionsAndroid.RESULTS.GRANTED
+      
+      // TDL: I'm not sure this is necessary anymore with updated libraries or something
+      //const isAuthorized = Platform.Version >= 23 ? granted === PermissionsAndroid.RESULTS.GRANTED : granted === true;
 
       this.setState({
         isAuthorized,
